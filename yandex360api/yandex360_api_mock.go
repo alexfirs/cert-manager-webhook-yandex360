@@ -227,7 +227,7 @@ func (y *Yandex360ApiMock) DnsListHandler(w http.ResponseWriter, req *http.Reque
 	}
 
 	total := len(domainEntries)
-	records := domainEntries[maxInt(0, (page-1)*perPage):minInt((page)*perPage, total)]
+	records := domainEntries[max(0, (page-1)*perPage):min((page)*perPage, total)]
 
 	resp := GetDataResponse{
 		Page:    page,
@@ -342,21 +342,6 @@ func getPagingAttributes(req *http.Request, defaultPage int, defaultPerPage int)
 }
 
 // utilities
-
-// get rid of these functions if migrate to go 1.21
-func minInt(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
-}
-func maxInt(a, b int) int {
-	if a > b {
-		return a
-	}
-	return b
-}
-
 func getJsonError(code int, message string) string {
 	return fmt.Sprintf(ErrTemplate, code, message)
 }

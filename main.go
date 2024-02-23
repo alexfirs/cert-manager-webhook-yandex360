@@ -44,9 +44,9 @@ func main() {
 // To do so, it must implement the `github.com/cert-manager/cert-manager/pkg/acme/webhook.Solver`
 // interface.
 type yandex360DNSSolver struct {
-	name               string
-	yandex360apiClient *yandex360api.ApiClient
-	client             *kubernetes.Clientset
+	name      string
+	apiClient *yandex360api.ApiClient
+	k8sClient *kubernetes.Clientset
 }
 
 // customDNSProviderConfig is a structure that is used to decode into when
@@ -85,14 +85,24 @@ func (y *yandex360DNSSolver) Name() string {
 // cert-manager itself will later perform a self check to ensure that the
 // solver has correctly configured the DNS provider.
 func (y *yandex360DNSSolver) Present(ch *v1alpha1.ChallengeRequest) error {
+	var chString string
+	if ch != nil {
+		chString = fmt.Sprintf("rn: %s, rz: %s, rfqdn: %s, dnsn: %s", ch.ResourceNamespace, ch.ResolvedZone, ch.ResolvedFQDN, ch.DNSName)
+	}
+
+	klog.Infof("solver.present: ch.: %s", chString)
+
 	apiSettings, err := y.getApiSettingsForChallengeRequest(ch)
 	if err != nil {
 		return err
 	}
+	klog.Infof("solver.present: after getApiSettingsForChallengeRequest: api: %s, orgId:%d, token:%s ", apiSettings.ApiUrl, apiSettings.OrganizationId, apiSettings.Token)
 
 	name := strings.TrimSuffix(ch.ResolvedFQDN, "."+apiSettings.Domain+".")
-	y.client.AddTxtRecord(apiSettings, name, ch.Key)
-
+	err = y.apiClient.AddTxtRecord(apiSettings, name, ch.Key)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -109,8 +119,10 @@ func (y *yandex360DNSSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 	}
 
 	name := strings.TrimSuffix(ch.ResolvedFQDN, "."+apiSettings.Domain+".")
-	y.client.DeleteTxtRecordByName(apiSettings, name)
-
+	err = y.apiClient.DeleteTxtRecordByName(apiSettings, name)
+	if err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -125,7 +137,7 @@ func (y *yandex360DNSSolver) CleanUp(ch *v1alpha1.ChallengeRequest) error {
 // where a SIGTERM or similar signal is sent to the webhook process.
 func (y *yandex360DNSSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-chan struct{}) error {
 
-	if y.client != nil {
+	if y.k8sClient != nil {
 		return nil
 	}
 
@@ -134,7 +146,7 @@ func (y *yandex360DNSSolver) Initialize(kubeClientConfig *rest.Config, stopCh <-
 		return err
 	}
 
-	y.client = cl
+	y.k8sClient = cl
 	return nil
 }
 
@@ -153,13 +165,13 @@ func loadConfig(cfgJSON *extapi.JSON) (yandex360DNSProviderConfig, error) {
 	return cfg, nil
 }
 
-func (y *yandex360DNSSolver) getApiSettingsForChallengeRequest(ch *v1alpha1.ChallengeRequest) (*ApiSettings, error) {
+func (y *yandex360DNSSolver) getApiSettingsForChallengeRequest(ch *v1alpha1.ChallengeRequest) (*yandex360api.ApiSettings, error) {
 	var chString string
 	if ch != nil {
 		chString = fmt.Sprintf("rn: %s, rz: %s, rfqdn: %s, dnsn: %s", ch.ResourceNamespace, ch.ResolvedZone, ch.ResolvedFQDN, ch.DNSName)
 	}
 
-	klog.Infof("solver.cleanUp ch.: %s", chString)
+	klog.Infof("solver.getApiSettingsForChallengeRequest ch.: %s", chString)
 
 	cfg, err := loadConfig(ch.Config)
 	if err != nil {
@@ -178,17 +190,21 @@ func (y *yandex360DNSSolver) getApiSettingsForChallengeRequest(ch *v1alpha1.Chal
 	}
 
 	domain := getDomainFromZone(ch.ResolvedZone)
+
 	apiSettings := &yandex360api.ApiSettings{ApiUrl: apiUrl, Token: token, OrganizationId: cfg.OrganizationId, Domain: domain}
+	klog.Infof("solver.getApiSettingsForChallengeRequest ch.: %s, api:%s, token:%s, orgId:%d, domain:%s ", chString, apiUrl, token, cfg.OrganizationId, domain)
 	return apiSettings, nil
 }
 
 func (s *yandex360DNSSolver) secret(ref certmgrapiv1.SecretKeySelector, namespace string) (string, error) {
+	klog.Infof("solver.secret name:%s", ref.Name)
 	if ref.Name == "" {
 		return "", nil
 	}
 
-	secret, err := s.client.CoreV1().Secrets(namespace).Get(context.TODO(), ref.Name, metav1.GetOptions{})
+	secret, err := s.k8sClient.CoreV1().Secrets(namespace).Get(context.TODO(), ref.Name, metav1.GetOptions{})
 	if err != nil {
+		klog.Errorf("solver.secret: calling k8s: %v", err)
 		return "", err
 	}
 
@@ -201,8 +217,8 @@ func (s *yandex360DNSSolver) secret(ref certmgrapiv1.SecretKeySelector, namespac
 
 func New(url *url.URL) webhook.Solver {
 	e := &yandex360DNSSolver{
-		name:   "yandex360-dns-solver",
-		client: yandex360api.NewApiClient(),
+		name:      "yandex360-dns-solver",
+		apiClient: yandex360api.NewApiClient(),
 	}
 	return e
 }

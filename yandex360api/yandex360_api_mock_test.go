@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-const baseUrl = "http://localhost:8488/directory/v1/org/"
+const baseUrl = "http://localhost:8489/directory/v1/org/"
 
 type yandex360apiMockTestSuite struct {
 	suite.Suite
@@ -26,7 +26,7 @@ func (suite *yandex360apiMockTestSuite) SetupTest() {
 	suite.client = http.DefaultClient
 
 	go func() {
-		suite.yandex360api.Run(":8488")
+		suite.yandex360api.Run(":8489")
 	}()
 }
 

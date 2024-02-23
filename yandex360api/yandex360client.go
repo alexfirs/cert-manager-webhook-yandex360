@@ -123,7 +123,12 @@ func addDnsRecord(httpClient http.Client, apiUrl url.URL, token string, companyI
 	r, err := httpClient.Do(req)
 
 	if err != nil {
-		return fmt.Errorf("post failed: %d", r.StatusCode)
+		if r != nil {
+			return fmt.Errorf("post failed: %d, %v", r.StatusCode, err)
+		} else {
+			return fmt.Errorf("post failed: %v", err)
+		}
+
 	}
 
 	if r.StatusCode != 200 {

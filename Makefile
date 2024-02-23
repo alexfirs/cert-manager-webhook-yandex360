@@ -1,4 +1,4 @@
-lsGO ?= $(shell which go)
+GO ?= $(shell which go)
 OS ?= $(shell $(GO) env GOOS)
 ARCH ?= $(shell $(GO) env GOARCH)
 

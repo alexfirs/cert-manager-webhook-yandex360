@@ -8,24 +8,26 @@ import (
 )
 
 func (y *Yandex360ApiMock) handleDNSRequest(w dns.ResponseWriter, req *dns.Msg) {
-	fmt.Println("\n\nHandleDNS")
+	fmt.Print("HandleDNS:")
 	msg := new(dns.Msg)
-	fmt.Println("\n\n>" + msg.String())
+	fmt.Println(msg.String())
 	msg.SetReply(req)
 	switch req.Opcode {
 	case dns.OpcodeQuery:
 		for _, q := range msg.Question {
-			fmt.Println("\n\n>> for")
 			if err := y.addDNSAnswer(q, msg, req); err != nil {
 				msg.SetRcode(req, dns.RcodeServerFailure)
+				fmt.Printf("Error %v\n", err)
 				break
 			}
 		}
 	}
 	w.WriteMsg(msg)
+	fmt.Println("HandleDNS Reply:" + msg.String())
 }
 
 func (y *Yandex360ApiMock) addDNSAnswer(q dns.Question, msg *dns.Msg, req *dns.Msg) error {
+	fmt.Printf("addDNSAnswer QType:%v, %s >> \n", q.Qtype, q.Name)
 	switch q.Qtype {
 	// Always return loopback for any A query
 	case dns.TypeA:
@@ -90,6 +92,7 @@ func (y *Yandex360ApiMock) addDNSAnswer(q dns.Question, msg *dns.Msg, req *dns.M
 
 	// NS and SOA are for authoritative lookups, return obviously invalid data
 	case dns.TypeNS:
+		fmt.Println("\n\n>> TypeNS: " + q.Name)
 		rr, err := dns.NewRR(fmt.Sprintf("%s 5 IN NS ns.example-acme-webook.invalid.", q.Name))
 		if err != nil {
 			return err

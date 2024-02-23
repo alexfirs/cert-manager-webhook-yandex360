@@ -22,5 +22,12 @@ var Yandex360ApiMock_TestData = Yandex360ApiMockSettings{
 				DnsRecord{RecordID: 3, Name: "sometxt3", Type: "TXT", TTL: 21600, Text: "randomtext3"},
 			},
 		},
+		1003: {
+			"example.com": Records{
+				DnsRecord{RecordID: 1, Name: "@", Type: "A", TTL: 21600, Address: "8.9.10.11"},
+				DnsRecord{RecordID: 2, Name: "cname3", Type: "CNAME", TTL: 21600, Target: "someother3.site"},
+				DnsRecord{RecordID: 3, Name: "sometxt3", Type: "TXT", TTL: 21600, Text: "randomtext3"},
+			},
+		},
 	},
 }
