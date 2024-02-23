@@ -18,6 +18,8 @@ import (
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/apis/acme/v1alpha1"
 	"github.com/cert-manager/cert-manager/pkg/acme/webhook/cmd"
 	certmgrapiv1 "github.com/cert-manager/cert-manager/pkg/apis/meta/v1"
+
+	"github.com/alexfirs/cert-manager-webhook-yandex360/yandex360api"
 )
 
 var GroupName = os.Getenv("GROUP_NAME")
