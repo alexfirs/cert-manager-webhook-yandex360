@@ -33,7 +33,13 @@ curl https://api360.yandex.net/directory/v1/org/<ORG_ID>/domains/<DOMAIN>/dns --
 
 ### Install cert-manager (*optional step*)
 
-**ATTENTION!** Yandex360 seems to update dns entries **VERY** slow, so in order to make it working you will need to update cert-manager (or create separate instance in separate namespace) with *--dns01-check-retry-period=600s* argument for controller deployment
+**ATTENTION!** Yandex360 seems to update dns entries **VERY** slow, so in order to make it working you will need to update cert-manager (or create separate instance in separate namespace) with 
+```yaml
+- --dns01-check-retry-period=600s
+- --dns01-recursive-nameservers-only 
+- --dns01-recursive-nameservers=8.8.8.8:53,1.1.1.1:53
+```
+arguments for controller deployment
 
 **ATTENTION!** You should not delete the cert-manager if you are already using it.
 
