@@ -1,58 +1,180 @@
-<p align="center">
-  <img src="https://raw.githubusercontent.com/cert-manager/cert-manager/d53c0b9270f8cd90d908460d69502694e1838f5f/logo/logo-small.png" height="256" width="256" alt="cert-manager project logo" />
-</p>
+# Cert-Manager DNS01 webhook for the Yandex360
 
-# ACME webhook example
+### Intro
 
-The ACME issuer type supports an optional 'webhook' solver, which can be used
-to implement custom DNS01 challenge solving logic.
+cert-manager automates the management and issuance of TLS certificates in Kubernetes clusters. It ensures that certificates are valid and updates them when necessary.
 
-This is useful if you need to use cert-manager with a DNS provider that is not
-officially supported in cert-manager core.
+A certificate authority resource, such as ClusterIssuer, must be declared in the cluster to start the certificate issuance procedure. It is used to generate signed certificates by honoring certificate signing requests.
 
-## Why not in core?
+For some DNS providers, there are no predefined CusterIssuer resources. Fortunately, cert-manager allows you to write your own ClusterIssuer.
 
-As the project & adoption has grown, there has been an influx of DNS provider
-pull requests to our core codebase. As this number has grown, the test matrix
-has become un-maintainable and so, it's not possible for us to certify that
-providers work to a sufficient level.
+This solver allows you to use cert-manager with the Yandex360 API. Documentation on the Yandex360 API is available [here](https://yandex.ru/dev/api360/doc/ref/DomainDNSService.html).
 
-By creating this 'interface' between cert-manager and DNS providers, we allow
-users to quickly iterate and test out new integrations, and then packaging
-those up themselves as 'extensions' to cert-manager.
+Yandex360 allows to have multiple organizations per account and each organization may have multiple domains, so it will be required to create an issuer per organization. You also will need organization id (can be found on the left bottom of a web page in a browser when organization is selected on https://admin.yandex.ru)
 
-We can also then provide a standardised 'testing framework', or set of
-conformance tests, which allow us to validate the a DNS provider works as
-expected.
 
-## Creating your own webhook
+# Usage
 
-Webhook's themselves are deployed as Kubernetes API services, in order to allow
-administrators to restrict access to webhooks with Kubernetes RBAC.
+### Preparation
 
-This is important, as otherwise it'd be possible for anyone with access to your
-webhook to complete ACME challenge validations and obtain certificates.
+You must [get an api token with](https://yandex.ru/dev/api360/doc/concepts/access.html)
+```
+directory:manage_dns 
+```
+permission. 
 
-To make the set up of these webhook's easier, we provide a template repository
-that can be used to get started quickly.
+1. Create app with directory:manage_dns permission. For the redirect url use placeholder - https://oauth.yandex.ru/verification_code, this page will show token on successful login
+2. Remember ClientId from app page and navigate to https://oauth.yandex.ru/authorize?response_type=token&client_id=<CLIENT_ID>
+3. After authorization save received token. Token valid for one year
+4. (optional) check if token works executing
+```
+curl https://api360.yandex.net/directory/v1/org/<ORG_ID>/domains/<DOMAIN>/dns --header 'Authorization: OAuth <AUTH_TOKEN>'
+```
 
-### Creating your own repository
+### Install cert-manager (*optional step*)
 
-### Running the test suite
+**ATTENTION!** Yandex360 seems to update dns entries **VERY** slow, so in order to make it working you will need to update cert-manager (or create separate instance in separate namespace) with *--dns01-check-retry-period=600s* argument for controller deployment
 
-All DNS providers **must** run the DNS01 provider conformance testing suite,
-else they will have undetermined behaviour when used with cert-manager.
+**ATTENTION!** You should not delete the cert-manager if you are already using it.
 
-**It is essential that you configure and run the test suite when creating a
-DNS01 webhook.**
+Use the following command from the [official documentation](https://cert-manager.io/docs/installation/) to install cert-manager in your Kubernetes cluster:
 
-An example Go test file has been provided in [main_test.go](https://github.com/cert-manager/webhook-example/blob/master/main_test.go).
+```shell
+kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/VERSION/cert-manager.yaml
+```
+*  where `VERSION` is necessary version (for example, v1.14.3 )
 
-You can run the test suite with:
+### Install the webhook
+Start with 
+```shell
+git clone https://github.com/alexfirs/cert-manager-webhook-yandex360.git
+```
+Now you have 2 options - use precompiled image from docker hub or compile it by yourselv
+
+#### if you want to build from source
+```shell
+make build
+```
+
+
+Edit the `deploy/webhook-yandex360/values.yaml` file in the cloned repository and enter the appropriate values in the fields, primarly group name. If you built it manually - provide correct image name
+```yaml
+issuer:
+  image: alexfirs/cert-bot-webhook-yandex360:1.0.0
+```
+
+You must also specify your namespace with the `cert-manager`.
+
+```yaml
+certManager:
+  namespace: my-namespace-cert-manager
+  serviceAccountName: cert-manager
+```
+
+
+
+Next, run the following commands for the install webhook.
+
+```shell
+cd cert-manager-webhook-yandex360
+helm install -n my-namespace-cert-manager webhook-yandex360 ./deploy/webhook-yandex360
+```
+
+### Create a ClusterIssuer
+
+Create the `ClusterIssuer.yaml` file with the following contents (make sure you update the dnsZones and group name. You will need a cluster issuer per organization): 
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging-with-yandex360
+spec:
+  acme:
+    # prod : https://acme-v02.api.letsencrypt.org/directory
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: your@email.com #this needs to be updated
+    privateKeySecretRef:
+      name: letsencrypt-staging
+    solvers:
+    - selector:
+        dnsZones:
+        - 'alexfirs.ru' # afirs.ru and *.afirs.ru
+      dns01:
+        webhook:
+          config:
+            apiTokenSecretRef:
+              name: yandex360-secret
+              key: token
+            organizationId: 123456789
+            endpoint: "https://api360.yandex.net"
+          groupName: acme.alexfirs.ru
+          solverName: yandex360-dns-solver
+```
+and create the resource:
+
+```shell
+kubectl create -f ClusterIssuer.yaml
+```
+
+#### Token
+
+You have to provide a `token` for the webhook so that it can access the HTTP API.
+
+```yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: yandex360-secret
+  namespace: cert-manager
+type: Opaque
+stringData:
+  token: "<TOKEN>"
+```
+and create a resource
+```shell
+kubectl create -f Secret.yaml
+```
+
+### Create a certificate
+
+Create the `certificate.yaml` file with the following contents:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: acmetest-star-afirs-ru
+spec:
+  secretName: star-afirs-ru-tls
+  duration: 2160h # 90d
+  renewBefore: 360h # 15d
+  dnsNames:
+  - '*.afirs.ru'
+  issuerRef:
+    name: letsencrypt-staging-with-yandex360
+    kind: ClusterIssuer
+```
+
+## Tests
+
+You can run the webhook test suite with:
 
 ```bash
 $ TEST_ZONE_NAME=example.com. make test
 ```
 
-The example file has a number of areas you must fill in and replace with your
-own options in order for tests to pass.
+# Community
+
+Please feel free to contact me if you have any questions - notffirk@gmail.com
+
+
+# License
+
+Apache License 2.0, see [LICENSE](LICENSE).
+
+# Thanks
+Thanks for inspiration
+```
+https://github.com/boryashkin/cert-manager-webhook-beget
+https://github.com/flant/cert-manager-webhook-regru
+```

@@ -21,8 +21,8 @@ func NewApiClient() *ApiClient {
 	}
 }
 
-func (a *ApiClient) AddTxtRecord(apiSettings *ApiSettings, name string, text string) error {
-	err := a.AddDnsRecord(apiSettings, DnsRecord{Name: name, Text: text, Type: "TXT", TTL: 21600})
+func (a *ApiClient) AddTxtRecord(apiSettings *ApiSettings, name string, text string, ttl int) error {
+	err := a.AddDnsRecord(apiSettings, DnsRecord{Name: name, Text: text, Type: "TXT", TTL: ttl})
 	if err != nil {
 		return fmt.Errorf("failed to AddTxtRecord: %v", err)
 	}

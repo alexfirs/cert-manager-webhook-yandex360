@@ -10,6 +10,7 @@ type ApiSettings struct {
 	Token          string
 	OrganizationId int
 	Domain         string
+	TTL            int
 }
 
 type ApiClient struct {

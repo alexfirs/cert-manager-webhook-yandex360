@@ -17,13 +17,11 @@ func (y *Yandex360ApiMock) handleDNSRequest(w dns.ResponseWriter, req *dns.Msg) 
 		for _, q := range msg.Question {
 			if err := y.addDNSAnswer(q, msg, req); err != nil {
 				msg.SetRcode(req, dns.RcodeServerFailure)
-				fmt.Printf("Error %v\n", err)
 				break
 			}
 		}
 	}
 	w.WriteMsg(msg)
-	fmt.Println("HandleDNS Reply:" + msg.String())
 }
 
 func (y *Yandex360ApiMock) addDNSAnswer(q dns.Question, msg *dns.Msg, req *dns.Msg) error {

@@ -35,7 +35,7 @@ func main() {
 	// webhook, where the Name() method will be used to disambiguate between
 	// the different implementations.
 	cmd.RunWebhookServer(GroupName,
-		&yandex360DNSSolver{},
+		New(),
 	)
 }
 
@@ -67,6 +67,7 @@ type yandex360DNSProviderConfig struct {
 	Endpoint          string                         `json:"endpoint"`
 	OrganizationId    int                            `json:"organizationId"`
 	APITokenSecretRef certmgrapiv1.SecretKeySelector `json:"apiTokenSecretRef"`
+	TTL               int                            `json:"ttl"`
 }
 
 // Name is used as the name for this DNS solver when referencing it on the ACME
@@ -96,10 +97,10 @@ func (y *yandex360DNSSolver) Present(ch *v1alpha1.ChallengeRequest) error {
 	if err != nil {
 		return err
 	}
-	klog.Infof("solver.present: after getApiSettingsForChallengeRequest: api: %s, orgId:%d, token:%s ", apiSettings.ApiUrl, apiSettings.OrganizationId, apiSettings.Token)
+	klog.Infof("solver.present: after getApiSettingsForChallengeRequest: api: %s, orgId:%d, ttl:%d, token len:%d ", apiSettings.ApiUrl, apiSettings.OrganizationId, apiSettings.TTL, len(apiSettings.Token))
 
 	name := strings.TrimSuffix(ch.ResolvedFQDN, "."+apiSettings.Domain+".")
-	err = y.apiClient.AddTxtRecord(apiSettings, name, ch.Key)
+	err = y.apiClient.AddTxtRecord(apiSettings, name, ch.Key, apiSettings.TTL)
 	if err != nil {
 		return err
 	}
@@ -191,8 +192,13 @@ func (y *yandex360DNSSolver) getApiSettingsForChallengeRequest(ch *v1alpha1.Chal
 
 	domain := getDomainFromZone(ch.ResolvedZone)
 
-	apiSettings := &yandex360api.ApiSettings{ApiUrl: apiUrl, Token: token, OrganizationId: cfg.OrganizationId, Domain: domain}
-	klog.Infof("solver.getApiSettingsForChallengeRequest ch.: %s, api:%s, token:%s, orgId:%d, domain:%s ", chString, apiUrl, token, cfg.OrganizationId, domain)
+	ttl := 300
+	if cfg.TTL > 0 {
+		ttl = cfg.TTL
+	}
+
+	apiSettings := &yandex360api.ApiSettings{ApiUrl: apiUrl, Token: token, OrganizationId: cfg.OrganizationId, Domain: domain, TTL: ttl}
+	klog.Infof("solver.getApiSettingsForChallengeRequest ch.: %s, api:%s, token len:%d, orgId:%d, domain:%s, ttl:%d ", chString, apiUrl, len(token), cfg.OrganizationId, domain, ttl)
 	return apiSettings, nil
 }
 
@@ -215,7 +221,7 @@ func (s *yandex360DNSSolver) secret(ref certmgrapiv1.SecretKeySelector, namespac
 	return strings.TrimSuffix(string(bytes), "\n"), nil
 }
 
-func New(url *url.URL) webhook.Solver {
+func New() webhook.Solver {
 	e := &yandex360DNSSolver{
 		name:      "yandex360-dns-solver",
 		apiClient: yandex360api.NewApiClient(),

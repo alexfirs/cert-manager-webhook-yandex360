@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"net/url"
 	"os"
 	"testing"
 
@@ -36,11 +35,6 @@ func TestRunsSuite(t *testing.T) {
 	// The manifest path should contain a file named config.json that is a
 	// snippet of valid configuration that should be included on the
 	// ChallengeRequest passed as part of the test cases.
-	yandex360apiMockUrl, err := url.Parse("http://localhost:60001")
-	if err != nil {
-		t.FailNow()
-	}
-
 	api := yandex360api.NewYandex360ApiMock(yandex360api.Yandex360ApiMock_TestData)
 	go func() {
 		api.Run(":60001")
@@ -56,7 +50,7 @@ func TestRunsSuite(t *testing.T) {
 		t.Log("stopped servers")
 	}()
 
-	solver := New(yandex360apiMockUrl)
+	solver := New()
 
 	fixture := acmetest.NewFixture(solver,
 		acmetest.SetResolvedZone(zone),
@@ -65,16 +59,8 @@ func TestRunsSuite(t *testing.T) {
 		acmetest.SetDNSServer("127.0.0.1:59351"),
 		acmetest.SetUseAuthoritative(false),
 	)
-
-	// fixture := acmetest.NewFixture(solver,
-	// 	acmetest.SetResolvedZone("example.com."),
-	// 	acmetest.SetManifestPath("testdata/my-custom-solver"),
-	// 	acmetest.SetDNSServer("127.0.0.1:59351"),
-	// 	acmetest.SetUseAuthoritative(false),
-	// )
-	//need to uncomment and  RunConformance delete runBasic and runExtended once https://github.com/cert-manager/cert-manager/pull/4835 is merged
-	//fixture.RunConformance(t)
 	fixture.RunBasic(t)
 	fixture.RunExtended(t)
+	//fixture.RunConformance(t)
 
 }

@@ -48,7 +48,7 @@ func (suite *ApiClientTestSuite) TestApiClient_GetDnsRecords() {
 func (suite *ApiClientTestSuite) TestApiClient_AddTxtRecord() {
 
 	// basic add
-	err := suite.client.AddTxtRecord(&ApiSettings{ApiUrl: suite.apiUrl, OrganizationId: 1001, Domain: "example1.com", Token: Yandex360ApiMock_TestData.authKey}, "sometxt10", "sometxtvalue")
+	err := suite.client.AddTxtRecord(&ApiSettings{ApiUrl: suite.apiUrl, OrganizationId: 1001, Domain: "example1.com", Token: Yandex360ApiMock_TestData.authKey}, "sometxt10", "sometxtvalue", 300)
 	suite.Require().NoError(err, "AddTxtRecord returned error")
 }
 

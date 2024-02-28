@@ -1,0 +1,9 @@
+{
+    "apiTokenSecretRef": {
+      "name": "yandex360-credentials",
+      "key": "token"
+    },
+    "organizationId": 1003,
+    "endpoint": "http://localhost:60001",
+    "ttl":600
+  }
